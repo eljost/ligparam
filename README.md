@@ -1,0 +1,3 @@
+# ligparam
+
+Install with `poetry`.
