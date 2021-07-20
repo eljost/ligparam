@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "ligparam"
+version = "0.1.0"
+description = "Simple GUI to facilitate ligand parametrization using OpenMM"
+authors = ["Johannes Steinmetzer <josteinm@posteo.de>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+ParmEd = "^3.2.0"
+pyqtgraph = "^0.12.2"
+# pysisyphus = { git = "https://github.com/eljost/pysisyphus.git" }
+pysisyphus = { path = "../pysisyphus", develop = true }
+networkx = "^2.6.1"
+PyQt5 = "^5.15.4"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+ligparam = "ligparam.main:run"
