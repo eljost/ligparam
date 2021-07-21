@@ -1,6 +1,6 @@
 import sys
 
-from parmed.charmm import CharmmParameterSet
+from parmed.charmm import CharmmParameterSet, CharmmPsfFile
 from pyqtgraph.Qt import mkQApp
 import pyqtgraph as pg
 
@@ -15,15 +15,19 @@ def test_version():
 def test_dialog():
     mkQApp("dialog test")
     inp = "azb.str"
+    param_fns = (
+        "par_all36_cgenff.prm",
+        "top_all36_cgenff.rtf",
+        inp,
+    )
     resi = "AZB"
-    params = CharmmParameterSet(inp)
+    params = CharmmParameterSet(*param_fns)
     print(f"Loaded '{inp}'")
     resis = params.residues
     print(f"Found {len(resis)} residue(s)")
-    for i, resi in enumerate(params.residues):
-        print(f"\t{i:03d}: {resi}")
     resi = params.residues[resi]
     print(f"Chose residue '{resi}'")
+    top = CharmmPsfFile("azb.psf")
 
     btype = ("NG2D1", "NG2D1")
     bterms = [params.bond_types[btype]]
@@ -38,7 +42,7 @@ def test_dialog():
     dterms = params.dihedral_types[dtype]
     dnodes = ("C4", "C5", "N1", "N2")
 
-    td = TermDialog(bnodes, btype, bterms, binds)
+    td = TermDialog(bnodes, btype, bterms, binds, top, params)
     # td = TermDialog(anodes, atype, aterms)
     # td = TermDialog(dnodes, dtype, dterms)
     td.show()

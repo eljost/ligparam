@@ -4,7 +4,7 @@ import sys
 
 import networkx as nx
 import numpy as np
-from parmed.charmm import CharmmParameterSet
+from parmed.charmm import CharmmParameterSet, CharmmPsfFile
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, mkQApp
 
@@ -119,16 +119,20 @@ class Main(pg.GraphicsLayoutWidget):
         self.graph = Graph()
         self.vb.addItem(self.graph)
 
-    def set_charmm_resi(self, resi, params):
-        G = resi.to_networkx()
+    def set_charmm_resi(self, resi, top, params):
+        self.resi = resi
+        self.top = top
+        self.params = params
+
+        G = self.resi.to_networkx()
         nodes = [n for n in G.nodes]
         edges = [e[:-1] for e in nx.to_edgelist(G)]
         pos = nx.kamada_kawai_layout(G)
         pos_arr = np.array([pos[n] for n in nodes])
         self.node_map = {node: i for i, node in enumerate(nodes)}
         self.inv_node_map = {i: node for node, i in self.node_map.items()}
-        self.type_map = {atom.name: atom.type for atom in resi.atoms}
-        self.params = params
+        atoms = self.resi.atoms
+        self.type_map = {atom.name: atom.type for atom in atoms}
 
         # Adjaceny array
         adj = list()
@@ -137,8 +141,8 @@ class Main(pg.GraphicsLayoutWidget):
         adj = np.array(adj, dtype=int)
 
         symbols = ["o" for n in nodes]
-        charges = [atom.charge for atom in resi.atoms]
-        types = [atom.type for atom in resi.atoms]
+        charges = [atom.charge for atom in atoms]
+        types = [atom.type for atom in atoms]
 
         self.graph.texts = (
             nodes,
@@ -179,7 +183,7 @@ class Main(pg.GraphicsLayoutWidget):
             print(f"\t{i:02d}: {term}")
 
         indices = [self.node_map[node] for node in nodes]
-        self.td = TermDialog(nodes, types, terms, indices)
+        self.td = TermDialog(nodes, types, terms, indices, self.top, self.params)
         self.td.exec_()
         print()
 
@@ -197,7 +201,8 @@ class Main(pg.GraphicsLayoutWidget):
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument("inp")
+    parser.add_argument("str")
+    parser.add_argument("psf")
     parser.add_argument("resi")
 
     return parser.parse_args(args)
@@ -205,21 +210,29 @@ def parse_args(args):
 
 def run():
     args = parse_args(sys.argv[1:])
-    inp = args.inp
+    str_ = args.str
+    psf = args.psf
     resi_ = args.resi
 
-    params = CharmmParameterSet(inp)
-    print(f"Loaded '{inp}'")
+    param_fns = (
+        "par_all36_cgenff.prm",
+        "top_all36_cgenff.rtf",
+        str_,
+    )
+    print("Loading files using ParmEd:")
+    for i, fn in enumerate(param_fns):
+        print(f"\t{i:02d}: {fn}")
+    params = CharmmParameterSet(*param_fns)
     resis = params.residues
     print(f"Found {len(resis)} residue(s)")
-    for i, resi in enumerate(params.residues):
-        print(f"\t{i:03d}: {resi}")
     resi = params.residues[resi_]
     print(f"Chose residue '{resi}'")
+    top = CharmmPsfFile(psf)
+    print(f"Loaded {psf}")
 
     mkQApp("Parameter Editor")
     main = Main()
-    main.set_charmm_resi(resi, params)
+    main.set_charmm_resi(resi, top, params)
     pg.exec()
 
 

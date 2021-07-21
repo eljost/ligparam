@@ -6,10 +6,13 @@ import numpy as np
 from parmed.topologyobjects import BondType, AngleType, DihedralType
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, uic
+from pysisyphus.calculators.OpenMM import OpenMM
+from pysisyphus.constants import AU2KJPERMOL, BOHR2ANG
 from pysisyphus.helpers import geom_loader
 from pysisyphus.intcoords.PrimTypes import PrimTypes as PT
 from pysisyphus.run import run_scan, get_calc_closure
-from pysisyphus.constants import AU2KJPERMOL
+from pysisyphus.optimizers.RFOptimizer import RFOptimizer
+from simtk.openmm import app
 
 
 THIS_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
@@ -53,7 +56,7 @@ def run_scan_wrapper(geom, calc_getter, type_, indices, symmetric, steps, step_s
 
 
 class TermDialog(QtGui.QDialog):
-    def __init__(self, nodes, types, terms, indices, **kwargs):
+    def __init__(self, nodes, types, terms, indices, top, params, **kwargs):
         super().__init__(**kwargs)
         uic.loadUi(THIS_DIR / "dialog.ui", self)
 
@@ -61,6 +64,8 @@ class TermDialog(QtGui.QDialog):
         self.types = types
         self.terms = terms
         self.indices = indices
+        self.top = top
+        self.params = params
 
         dbl_validator = QtGui.QDoubleValidator(self)
         self.step_size.setValidator(dbl_validator)
@@ -79,9 +84,22 @@ class TermDialog(QtGui.QDialog):
         self.type_.setText(str(self.prim_type))
         self.prim_indices_le.setText(str(indices))
 
+        if self.prim_type == PT.BOND:
+            step_size = 0.05
+            unit = "Å"
+        else:
+            step_size = 5
+            unit = "deg"
+        self.step_size.setText(str(step_size))
+        self.step_unit.setText(unit)
         self.plot.addLegend()
 
     def update_plot(self, vals, ens, name, **plot_kwargs):
+        vals = vals.copy()
+        if self.prim_type == PT.BOND:
+            vals *= BOHR2ANG
+        else:
+            vals = np.rad2deg(vals)
         ens = ens.copy()
         ens -= ens.min()
         ens *= AU2KJPERMOL
@@ -90,6 +108,10 @@ class TermDialog(QtGui.QDialog):
     def get_scan_kwargs(self):
         steps = self.steps.value()
         step_size = float(self.step_size.text())
+        if self.prim_type == PT.BOND:
+            step_size /= BOHR2ANG
+        else:
+            step_size = np.deg2rad(step_size)
         symmetric = self.symmetric.isChecked()
         return steps, step_size, symmetric
 
@@ -120,7 +142,17 @@ class TermDialog(QtGui.QDialog):
 
     def run_ff_scan(self):
         geom = geom_loader("azb_gfnff_opt.xyz", coord_type="redund")
-        calc_getter = get_calc_closure("ligparam_scan", "xtb", {"gfn": "ff"})
+        self.top.coordinates = geom.coords3d * BOHR2ANG
+
+        def calc_getter(**kwargs):
+            calc = OpenMM(self.top, self.params, **kwargs)
+            return calc
+
+        # Obtain minimum at the current coordinates
+        geom.set_calculator(calc_getter())
+        opt = RFOptimizer(geom, thresh="gau", max_cycles=150)
+        opt.run()
+
         steps, step_size, symmetric = self.get_scan_kwargs()
         geoms, vals, ens = run_scan_wrapper(
             geom,

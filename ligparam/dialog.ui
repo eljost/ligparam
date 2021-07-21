@@ -101,14 +101,21 @@
        <item>
         <widget class="QLabel" name="label_4">
          <property name="text">
-          <string>Step size / au (rad):</string>
+          <string>Step size:</string>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QLineEdit" name="step_size">
          <property name="text">
-          <string>0.1</string>
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="step_unit">
+         <property name="text">
+          <string>Unit</string>
          </property>
         </widget>
        </item>
@@ -117,16 +124,23 @@
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_5">
        <item>
+        <widget class="QLabel" name="label_5">
+         <property name="text">
+          <string>Run Scan:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QPushButton" name="run_qm">
          <property name="text">
-          <string>Run QM</string>
+          <string>QM</string>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QPushButton" name="run_ff">
          <property name="text">
-          <string>Run FF</string>
+          <string>FF</string>
          </property>
         </widget>
        </item>
