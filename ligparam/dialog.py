@@ -95,7 +95,8 @@ class TermDialog(QtGui.QDialog):
 
         self.calcs = {
             "xtb": ("xtb", {}),
-            "orca": ("orca", {"keywords": "ri-mp2 6-31G* cc-pvdz/C"}),
+            "ORCA": ("orca", {"keywords": "ri-mp2 6-31G* cc-pvdz/C"}),
+            "Psi4": ("psi4", {"method": "mp2", "basis": "6-31G*"}),
         }
         for key, value in self.calcs.items():
             self.calc_level.addItem(str(key))
@@ -136,7 +137,6 @@ class TermDialog(QtGui.QDialog):
         is_ff = plot_kwargs.pop("is_ff", False)
         line = self.plot.plot(vals, ens, name=name, **plot_kwargs)
         if is_ff:
-            print("is ff append line")
             self.ff_lines.append(line)
 
     def clear_ff_plot(self):

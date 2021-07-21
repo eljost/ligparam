@@ -12,7 +12,8 @@ from ligparam.dialog import TermDialog
 def test_dialog():
     mkQApp("dialog test")
     inp = "azb.str"
-    qm_geom = geom_loader("azb_mp2.crd", coord_type="redund")
+    # qm_geom = geom_loader("azb_mp2.crd", coord_type="redund")
+    qm_geom = geom_loader("azb_psi4_opt.xyz", coord_type="redund")
     ff_geom = qm_geom.copy()
     param_fns = (
         "par_all36_cgenff.prm",
