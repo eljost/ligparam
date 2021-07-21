@@ -1,9 +1,9 @@
 import os
-
 from pathlib import Path
 
 import numpy as np
 from parmed.topologyobjects import BondType, AngleType, DihedralType
+import psutil
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, uic
 from pysisyphus.calculators.OpenMM import OpenMM
@@ -89,6 +89,19 @@ class TermDialog(QtGui.QDialog):
         self.term_table.set_terms(terms)
         self.run_qm.clicked.connect(self.run_qm_scan)
         self.run_ff.clicked.connect(self.run_ff_scan)
+        self.run_ff.setDefault(True)
+        self.clear_ff.clicked.connect(self.clear_ff_plot)
+        self.clear_all.clicked.connect(self.plot.clear)
+
+        self.calcs = {
+            "xtb": ("xtb", {}),
+            "orca": ("orca", {"keywords": "ri-mp2 6-31G* cc-pvdz/C"}),
+        }
+        for key, value in self.calcs.items():
+            self.calc_level.addItem(str(key))
+
+        self.ff_label_default = "default"
+        self.ff_label.setText(self.ff_label_default)
 
         prim_types = {
             2: PT.BOND,
@@ -109,6 +122,7 @@ class TermDialog(QtGui.QDialog):
         self.step_size.setText(str(step_size))
         self.step_unit.setText(unit)
         self.plot.addLegend()
+        self.ff_lines = list()
 
     def update_plot(self, vals, ens, name, **plot_kwargs):
         vals = vals.copy()
@@ -119,7 +133,18 @@ class TermDialog(QtGui.QDialog):
         ens = ens.copy()
         ens -= ens.min()
         ens *= AU2KJPERMOL
-        self.plot.plot(vals, ens, name=name, **plot_kwargs)
+        is_ff = plot_kwargs.pop("is_ff", False)
+        line = self.plot.plot(vals, ens, name=name, **plot_kwargs)
+        if is_ff:
+            print("is ff append line")
+            self.ff_lines.append(line)
+
+    def clear_ff_plot(self):
+        print("clear ff plot")
+        for line in self.ff_lines:
+            print(line)
+            line.clear()
+        self.ff_lines = list()
 
     def get_scan_kwargs(self):
         steps = self.steps.value()
@@ -133,13 +158,13 @@ class TermDialog(QtGui.QDialog):
 
     def run_qm_scan(self):
         geom = self.qm_geom.copy()
-        calc_kwargs = {
-            "keywords": "ri-mp2 6-31G* cc-pvdz/C",
-            "pal": 6,
-            "mem": 1000,
-        }
-        calc_getter = get_calc_closure("ligparam_scan", "orca", calc_kwargs)
-        # calc_getter = get_calc_closure("ligparam_scan", "xtb", {})
+        calc_key = self.calc_level.currentText()
+        calc_type, calc_kwargs = self.calcs[calc_key]
+
+        calc_kwargs = calc_kwargs.copy()
+        calc_kwargs["pal"] = psutil.cpu_count(logical=False)
+        calc_kwargs["mem"] = 1500
+        calc_getter = get_calc_closure("ligparam_scan", calc_type, calc_kwargs)
 
         steps, step_size, symmetric = self.get_scan_kwargs()
         geoms, vals, ens = run_scan_wrapper(
@@ -186,9 +211,10 @@ class TermDialog(QtGui.QDialog):
         self.setStatusTip("Relaxed scan finished")
         pen = pg.mkPen((0, 255, 0))
         ff_label = self.ff_label.text()
-        if ff_label == "default":
+        if ff_label == self.ff_label_default:
             ff_label = f"FF_{self.ff_scans}"
 
         # self.update_plot(vals, ens, f"FF_{self.ff_scans}", pen=pen, symbol="o")
-        self.update_plot(vals, ens, ff_label, pen=pen, symbol="o")
+        self.update_plot(vals, ens, ff_label, pen=pen, symbol="o", is_ff=True)
         self.ff_scans += 1
+        self.ff_label.setText(self.ff_label_default)

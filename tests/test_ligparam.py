@@ -3,6 +3,7 @@ import sys
 from parmed.charmm import CharmmParameterSet, CharmmPsfFile
 from pyqtgraph.Qt import mkQApp
 import pyqtgraph as pg
+from pysisyphus.helpers import geom_loader
 
 from ligparam import __version__
 from ligparam.dialog import TermDialog
@@ -11,6 +12,8 @@ from ligparam.dialog import TermDialog
 def test_dialog():
     mkQApp("dialog test")
     inp = "azb.str"
+    qm_geom = geom_loader("azb_mp2.crd", coord_type="redund")
+    ff_geom = qm_geom.copy()
     param_fns = (
         "par_all36_cgenff.prm",
         "top_all36_cgenff.rtf",
@@ -38,7 +41,7 @@ def test_dialog():
     dterms = params.dihedral_types[dtype]
     dnodes = ("C4", "C5", "N1", "N2")
 
-    td = TermDialog(bnodes, btype, bterms, binds, top, params)
+    td = TermDialog(bnodes, btype, bterms, binds, top, params, qm_geom, ff_geom)
     # td = TermDialog(anodes, atype, aterms)
     # td = TermDialog(dnodes, dtype, dterms)
     td.show()
