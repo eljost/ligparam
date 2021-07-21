@@ -13,20 +13,26 @@ from ligparam.dialog import TermDialog
 
 SHIFT = QtCore.Qt.Key_Shift
 SHIFT_MOD = QtCore.Qt.ShiftModifier
+PG_DOWN = QtCore.Qt.Key_PageDown
+PG_UP = QtCore.Qt.Key_PageUp
 BLUE_GREY = pg.mkBrush((101, 120, 149))
 
 
 class Graph(pg.GraphItem):
+    sigKeyRelease = QtCore.pyqtSignal(object)
+
     def __init__(self):
         self.dragPoint = None
         self.dragOffset = None
         self.textItems = []
         pg.GraphItem.__init__(self)
         self.scatter.sigClicked.connect(self.clicked)
+        self.sigKeyRelease.connect(self.keyReleaseEvent)
 
         self.gather = False
         self.stack = list()
         self._data_list = None
+        self.text_counter = 0
 
     def setData(self, **kwds):
         self.text = kwds.pop("text", [])
@@ -37,6 +43,9 @@ class Graph(pg.GraphItem):
             self.data["data"]["index"] = np.arange(self.npts)
         self.setTexts(self.text)
         self.updateGraph()
+
+    def get_text(self):
+        return self.texts[self.text_counter]
 
     def updateData(self, **kwargs):
         self.data.update(kwargs)
@@ -55,6 +64,12 @@ class Graph(pg.GraphItem):
         for i, item in enumerate(self.textItems):
             item.setPos(*self.data["pos"][i])
 
+    def get_symbol_brushes(self, selected):
+        symbol_brushes = [BLUE_GREY] * self.npts
+        for i in selected:
+            symbol_brushes[i] = pg.mkBrush(color=[255, 0, 0])
+        return symbol_brushes
+
     def clicked(self, scatter, pts):
         data_list = self.scatter.data.tolist()
         if self.gather:
@@ -62,10 +77,7 @@ class Graph(pg.GraphItem):
             index = data_list.index(point)
             if (index not in self.stack) and len(self.stack) < 4:
                 self.stack.append(index)
-
-                symbol_brushes = [BLUE_GREY] * self.npts
-                for i in self.stack:
-                    symbol_brushes[i] = pg.mkBrush(color=[255, 0, 0])
+                symbol_brushes = self.get_symbol_brushes(self.stack)
                 self.updateData(symbolBrush=symbol_brushes)
                 self.updateGraph()
 
@@ -73,6 +85,19 @@ class Graph(pg.GraphItem):
         mod = event.modifiers()
         self.gather = mod == SHIFT_MOD
         super().mousePressEvent(event)
+
+    def keyReleaseEvent(self, event):
+        key = event.key()
+        updated = key in (PG_DOWN, PG_UP)
+        if event.key() == PG_DOWN:
+            self.text_counter -= 1
+        elif event.key() == PG_UP:
+            self.text_counter += 1
+
+        if updated:
+            self.text_counter %= len(self.texts)
+            self.setTexts(self.get_text())
+            self.updateGraph()
 
 
 def get_graph(fn):
@@ -112,6 +137,14 @@ class Main(pg.GraphicsLayoutWidget):
         adj = np.array(adj, dtype=int)
 
         symbols = ["o" for n in nodes]
+        charges = [atom.charge for atom in resi.atoms]
+        types = [atom.type for atom in resi.atoms]
+
+        self.graph.texts = (
+            nodes,
+            [f"{charge:.4f}" for charge in charges],
+            types,
+        )
 
         symbol_brushes = [BLUE_GREY] * len(nodes)
         self.graph.setData(
@@ -120,7 +153,7 @@ class Main(pg.GraphicsLayoutWidget):
             size=0.1,
             symbol=symbols,
             pxMode=False,
-            text=nodes,
+            text=self.graph.get_text(),
             symbolBrush=symbol_brushes,
         )
 
@@ -145,16 +178,18 @@ class Main(pg.GraphicsLayoutWidget):
         for i, term in enumerate(terms):
             print(f"\t{i:02d}: {term}")
 
-        self.td = TermDialog(nodes, types, terms)
+        indices = [self.node_map[node] for node in nodes]
+        self.td = TermDialog(nodes, types, terms, indices)
         self.td.exec_()
         print()
 
     def keyReleaseEvent(self, event):
-        stack = self.graph.stack
+        super().keyPressEvent(event)
+        self.graph.sigKeyRelease.emit(event)
 
+        stack = self.graph.stack
         if event.key() == SHIFT:
             self.graph.stack = list()
-            print(f"Shift released: stack={stack}")
             if len(stack) > 1:
                 nodes = [self.inv_node_map[i] for i in stack]
                 self.show_term_dialog(nodes)

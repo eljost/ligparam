@@ -1,7 +1,8 @@
 import sys
 
 from parmed.charmm import CharmmParameterSet
-from PyQt5.QtWidgets import QApplication, QMainWindow
+from pyqtgraph.Qt import mkQApp
+import pyqtgraph as pg
 
 from ligparam import __version__
 from ligparam.dialog import TermDialog
@@ -12,8 +13,7 @@ def test_version():
 
 
 def test_dialog():
-    app = QApplication(sys.argv)
-    window = QMainWindow()
+    mkQApp("dialog test")
     inp = "azb.str"
     resi = "AZB"
     params = CharmmParameterSet(inp)
@@ -24,11 +24,11 @@ def test_dialog():
         print(f"\t{i:03d}: {resi}")
     resi = params.residues[resi]
     print(f"Chose residue '{resi}'")
-    window.show()
 
-    btype = ('CG2R61', 'CG2R61')
+    btype = ("NG2D1", "NG2D1")
     bterms = [params.bond_types[btype]]
-    bnodes = ("C1", "C2")
+    bnodes = ("N1", "N2")
+    binds = (6, 7)
 
     atype = ('CG2R61', 'CG2R61', 'CG2R61')
     aterms = [params.angle_types[atype]]
@@ -38,9 +38,8 @@ def test_dialog():
     dterms = params.dihedral_types[dtype]
     dnodes = ("C4", "C5", "N1", "N2")
 
-    # td = TermDialog(btype, bterms)
-    # td = TermDialog(atype, aterms)
+    td = TermDialog(bnodes, btype, bterms, binds)
+    # td = TermDialog(anodes, atype, aterms)
     # td = TermDialog(dnodes, dtype, dterms)
-    td = TermDialog(dnodes, dtype, dterms)
-    td.exec_()
-    app.exec()
+    td.show()
+    pg.exec()

@@ -639,7 +639,7 @@ heapdict = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "f8a1735ca701f09a4f4a3aee7b2781afe1cb1a12d07f4dc3ab7280ffc3eee7f8"
+content-hash = "7832163d55fe2368c92ba5365e5e78e990627faffc5d7b3609b8a2b3e17e245d"
 
 [metadata.files]
 atomicwrites = [
