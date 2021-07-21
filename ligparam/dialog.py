@@ -67,7 +67,9 @@ def run_scan_wrapper(geom, calc_getter, type_, indices, symmetric, steps, step_s
 
 
 class TermDialog(QtGui.QDialog):
-    def __init__(self, nodes, types, terms, indices, top, params, qm_geom, ff_geom, **kwargs):
+    def __init__(
+        self, nodes, types, terms, indices, top, params, qm_geom, ff_geom, **kwargs
+    ):
         super().__init__(**kwargs)
         uic.loadUi(THIS_DIR / "dialog.ui", self)
 
