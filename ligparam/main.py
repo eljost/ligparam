@@ -5,6 +5,7 @@ import sys
 import networkx as nx
 import numpy as np
 from parmed.charmm import CharmmParameterSet, CharmmPsfFile
+from pysisyphus.helpers import geom_loader
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, mkQApp
 
@@ -161,6 +162,10 @@ class Main(pg.GraphicsLayoutWidget):
             symbolBrush=symbol_brushes,
         )
 
+    def set_geoms(self, qm_geom, ff_geom):
+        self.qm_geom = qm_geom
+        self.ff_geom = ff_geom
+
     def show_term_dialog(self, nodes):
         funcs = {
             2: self.params.bond_types,
@@ -183,7 +188,16 @@ class Main(pg.GraphicsLayoutWidget):
             print(f"\t{i:02d}: {term}")
 
         indices = [self.node_map[node] for node in nodes]
-        self.td = TermDialog(nodes, types, terms, indices, self.top, self.params)
+        self.td = TermDialog(
+            nodes,
+            types,
+            terms,
+            indices,
+            self.top,
+            self.params,
+            self.qm_geom,
+            self.ff_geom,
+        )
         self.td.exec_()
         print()
 
@@ -204,8 +218,16 @@ def parse_args(args):
     parser.add_argument("str")
     parser.add_argument("psf")
     parser.add_argument("resi")
+    parser.add_argument("qm_geom_fn")
+    parser.add_argument("--ff_geom_fn", default=None)
 
     return parser.parse_args(args)
+
+
+def dump_params(top, params, prm_fn):
+    top.load_parameters(params)
+    resi_params = params.from_structure(top)
+    resi_params.write(par=prm_fn)
 
 
 def run():
@@ -213,6 +235,14 @@ def run():
     str_ = args.str
     psf = args.psf
     resi_ = args.resi
+    qm_geom_fn = args.qm_geom_fn
+
+    qm_geom = geom_loader(qm_geom_fn, coord_type="redund")
+    print(f"Loaded QM geometry from '{qm_geom_fn}'")
+    if args.ff_geom_fn is None:
+        ff_geom_fn = qm_geom_fn
+    ff_geom = geom_loader(ff_geom_fn, coord_type="redund")
+    print(f"Loaded FF geometry from '{ff_geom_fn}'")
 
     param_fns = (
         "par_all36_cgenff.prm",
@@ -233,7 +263,14 @@ def run():
     mkQApp("Parameter Editor")
     main = Main()
     main.set_charmm_resi(resi, top, params)
-    pg.exec()
+    main.set_geoms(qm_geom, ff_geom)
+    try:
+        pg.exec()
+    except Exception as err:
+        print(err)
+    prm_fn = f"{resi_.lower()}_optimized.prm"
+    dump_params(top, params, prm_fn)
+    print(f"Dumped optimized parameters to '{prm_fn}'")
 
 
 if __name__ == "__main__":

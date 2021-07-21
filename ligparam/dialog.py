@@ -8,7 +8,6 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, uic
 from pysisyphus.calculators.OpenMM import OpenMM
 from pysisyphus.constants import AU2KJPERMOL, BOHR2ANG
-from pysisyphus.helpers import geom_loader
 from pysisyphus.intcoords.PrimTypes import PrimTypes as PT
 from pysisyphus.run import run_scan, get_calc_closure
 from pysisyphus.optimizers.RFOptimizer import RFOptimizer
@@ -26,18 +25,30 @@ class TermTable(pg.TableWidget):
         DihedralType: [("phi_k", float), ("per", int), ("phase", float)],
     }
 
+    def __init__(self, *args, **kwargs):
+        kwargs["editable"] = True
+        super().__init__(*args, **kwargs)
+
     def set_terms(self, terms):
         self.terms = terms
-        type_ = type(self.terms[0])
-        dtype = self.dtypes[type_]
-        fields = [field for field, _ in dtype]
+        # BondType, AngleType or DihedralType
+        self.type_ = type(self.terms[0])
+        self.dtype = self.dtypes[self.type_]
+        self.fields = [field for field, _ in self.dtype]
 
         data = list()
         for term in terms:
-            d = [getattr(term, field) for field in fields]
+            d = [getattr(term, field) for field in self.fields]
             data.append(d)
-        data = np.core.records.fromarrays(np.array(data).T, dtype=dtype)
+        data = np.core.records.fromarrays(np.array(data).T, dtype=self.dtype)
+        self.data_backup = data.copy()
         self.setData(data)
+
+    def get_terms(self):
+        for i, term in enumerate(self.terms):
+            for j, (attr, conv) in enumerate(self.dtype):
+                data = self.item(i, j).text()
+                setattr(self.terms[i], attr, conv(data))
 
 
 def run_scan_wrapper(geom, calc_getter, type_, indices, symmetric, steps, step_size):
@@ -56,7 +67,7 @@ def run_scan_wrapper(geom, calc_getter, type_, indices, symmetric, steps, step_s
 
 
 class TermDialog(QtGui.QDialog):
-    def __init__(self, nodes, types, terms, indices, top, params, **kwargs):
+    def __init__(self, nodes, types, terms, indices, top, params, qm_geom, ff_geom, **kwargs):
         super().__init__(**kwargs)
         uic.loadUi(THIS_DIR / "dialog.ui", self)
 
@@ -66,6 +77,8 @@ class TermDialog(QtGui.QDialog):
         self.indices = indices
         self.top = top
         self.params = params
+        self.qm_geom = qm_geom
+        self.ff_geom = ff_geom
 
         dbl_validator = QtGui.QDoubleValidator(self)
         self.step_size.setValidator(dbl_validator)
@@ -84,6 +97,7 @@ class TermDialog(QtGui.QDialog):
         self.type_.setText(str(self.prim_type))
         self.prim_indices_le.setText(str(indices))
 
+        self.ff_scans = 0
         if self.prim_type == PT.BOND:
             step_size = 0.05
             unit = "Å"
@@ -116,16 +130,14 @@ class TermDialog(QtGui.QDialog):
         return steps, step_size, symmetric
 
     def run_qm_scan(self):
-        # geom = geom_loader("azb_mp2.crd", coord_type="redund")
-        geom = geom_loader("azb_xtb_opt.xyz", coord_type="redund")
-
+        geom = self.qm_geom.copy()
         calc_kwargs = {
-            "keywords": "hf sto-3g",
+            "keywords": "ri-mp2 6-31G* cc-pvdz/C",
             "pal": 6,
             "mem": 1000,
         }
-        # calc_getter = get_calc_closure("ligparam_scan", "orca", kwargs)
-        calc_getter = get_calc_closure("ligparam_scan", "xtb", {})
+        calc_getter = get_calc_closure("ligparam_scan", "orca", calc_kwargs)
+        # calc_getter = get_calc_closure("ligparam_scan", "xtb", {})
 
         steps, step_size, symmetric = self.get_scan_kwargs()
         geoms, vals, ens = run_scan_wrapper(
@@ -141,8 +153,14 @@ class TermDialog(QtGui.QDialog):
         self.update_plot(vals, ens, "QM", pen=pen, symbol="x")
 
     def run_ff_scan(self):
-        geom = geom_loader("azb_gfnff_opt.xyz", coord_type="redund")
+        geom = self.ff_geom.copy()
         self.top.coordinates = geom.coords3d * BOHR2ANG
+
+        # Update params with current values from TableWidget
+        self.term_table.get_terms()
+        print("Using current terms:")
+        for i, term in enumerate(self.terms):
+            print(f"\t{i:02d}: {term}")
 
         def calc_getter(**kwargs):
             calc = OpenMM(self.top, self.params, **kwargs)
@@ -163,5 +181,12 @@ class TermDialog(QtGui.QDialog):
             steps,
             step_size,
         )
+        self.setStatusTip("Relaxed scan finished")
         pen = pg.mkPen((0, 255, 0))
-        self.update_plot(vals, ens, "FF", pen=pen, symbol="o")
+        ff_label = self.ff_label.text()
+        if ff_label == "default":
+            ff_label = f"FF_{self.ff_scans}"
+
+        # self.update_plot(vals, ens, f"FF_{self.ff_scans}", pen=pen, symbol="o")
+        self.update_plot(vals, ens, ff_label, pen=pen, symbol="o")
+        self.ff_scans += 1
