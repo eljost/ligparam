@@ -96,7 +96,10 @@ class TermDialog(QtGui.QDialog):
         self.calcs = {
             "xtb": ("xtb", {}),
             "ORCA": ("orca", {"keywords": "ri-mp2 6-31G* cc-pvdz/C"}),
-            "Psi4": ("psi4", {"method": "mp2", "basis": "6-31G*"}),
+            "Psi4": (
+                "psi4",
+                {"method": "mp2", "basis": "6-31G*", "to_set": {"freeze_core": True}},
+            ),
         }
         for key, value in self.calcs.items():
             self.calc_level.addItem(str(key))
@@ -177,7 +180,8 @@ class TermDialog(QtGui.QDialog):
             step_size,
         )
         pen = pg.mkPen((255, 0, 0))
-        self.update_plot(vals, ens, "QM", pen=pen, symbol="x")
+        qm_label = f"QM_{calc_key}"
+        self.update_plot(vals, ens, qm_label, pen=pen, symbol="x")
 
     def run_ff_scan(self):
         geom = self.ff_geom.copy()
