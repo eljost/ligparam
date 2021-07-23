@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 import sys
 
 import networkx as nx
@@ -118,7 +119,6 @@ class Main(pg.GraphicsLayoutWidget):
         stack = self.graph.stack
         if event.key() == SHIFT:
             self.graph.stack = list()
-            print("updated graph")
             self.graph.updateGraph()
             if len(stack) > 1:
                 nodes = [self.inv_node_map[i] for i in stack]
@@ -139,7 +139,7 @@ def parse_args(args):
 def dump_params(top, params, prm_fn):
     top.load_parameters(params)
     resi_params = params.from_structure(top)
-    resi_params.write(par=prm_fn)
+    resi_params.write(par=str(prm_fn))
 
 
 def run():
@@ -171,6 +171,10 @@ def run():
     log(f"Chose residue '{resi}'")
     top = CharmmPsfFile(psf)
     log(f"Loaded {psf}")
+
+    prm_backup_fn = Path(str_).with_suffix(".prm.backup")
+    dump_params(top, params, prm_backup_fn)
+    log(f"Dumped parameter backup to '{prm_backup_fn}'")
 
     mkQApp("Parameter Editor")
     main = Main()
