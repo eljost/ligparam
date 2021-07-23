@@ -1,5 +1,7 @@
 import logging
 
+import pyqtgraph as pg
+
 
 __logger = logging.getLogger("ligparam")
 
@@ -10,3 +12,7 @@ def log(msg="", level=logging.INFO):
 
 def dbg(msg):
     log(msg, level=logging.DEBUG)
+
+
+def color(clr):
+    return pg.mkBrush(clr)

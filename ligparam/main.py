@@ -1,5 +1,4 @@
 import argparse
-import pickle
 import sys
 
 import networkx as nx
@@ -11,102 +10,10 @@ from pyqtgraph.Qt import QtCore, mkQApp
 
 from ligparam.dialog import TermDialog
 from ligparam.helpers import log
+from ligparam.Graph import Graph
 
 
 SHIFT = QtCore.Qt.Key_Shift
-SHIFT_MOD = QtCore.Qt.ShiftModifier
-PG_DOWN = QtCore.Qt.Key_PageDown
-PG_UP = QtCore.Qt.Key_PageUp
-BLUE_GREY = pg.mkBrush((101, 120, 149))
-
-
-class Graph(pg.GraphItem):
-    sigKeyRelease = QtCore.pyqtSignal(object)
-
-    def __init__(self):
-        self.dragPoint = None
-        self.dragOffset = None
-        self.textItems = []
-        pg.GraphItem.__init__(self)
-        self.scatter.sigClicked.connect(self.clicked)
-        self.sigKeyRelease.connect(self.keyReleaseEvent)
-
-        self.gather = False
-        self.stack = list()
-        self._data_list = None
-        self.text_counter = 0
-
-    def setData(self, **kwds):
-        self.text = kwds.pop("text", [])
-        self.data = kwds
-        if "pos" in self.data:
-            self.npts = self.data["pos"].shape[0]
-            self.data["data"] = np.empty(self.npts, dtype=[("index", int)])
-            self.data["data"]["index"] = np.arange(self.npts)
-        self.setTexts(self.text)
-        self.updateGraph()
-
-    def get_text(self):
-        return self.texts[self.text_counter]
-
-    def updateData(self, **kwargs):
-        self.data.update(kwargs)
-
-    def setTexts(self, text):
-        for i in self.textItems:
-            i.scene().removeItem(i)
-        self.textItems = []
-        for t in text:
-            item = pg.TextItem(t)
-            self.textItems.append(item)
-            item.setParentItem(self)
-
-    def updateGraph(self):
-        pg.GraphItem.setData(self, **self.data)
-        for i, item in enumerate(self.textItems):
-            item.setPos(*self.data["pos"][i])
-
-    def get_symbol_brushes(self, selected):
-        symbol_brushes = [BLUE_GREY] * self.npts
-        for i in selected:
-            symbol_brushes[i] = pg.mkBrush(color=[255, 0, 0])
-        return symbol_brushes
-
-    def clicked(self, scatter, pts):
-        data_list = self.scatter.data.tolist()
-        if self.gather:
-            point = [tup for tup in data_list if pts[0] in tup][0]
-            index = data_list.index(point)
-            if (index not in self.stack) and len(self.stack) < 4:
-                self.stack.append(index)
-                symbol_brushes = self.get_symbol_brushes(self.stack)
-                self.updateData(symbolBrush=symbol_brushes)
-                self.updateGraph()
-
-    def mousePressEvent(self, event):
-        mod = event.modifiers()
-        self.gather = mod == SHIFT_MOD
-        super().mousePressEvent(event)
-
-    def keyReleaseEvent(self, event):
-        key = event.key()
-        updated = key in (PG_DOWN, PG_UP)
-        if event.key() == PG_DOWN:
-            self.text_counter -= 1
-        elif event.key() == PG_UP:
-            self.text_counter += 1
-
-        if updated:
-            self.text_counter %= len(self.texts)
-            self.setTexts(self.get_text())
-            self.updateGraph()
-
-
-def get_graph(fn):
-    with open(fn, "rb") as handle:
-        bonds = pickle.load(handle)
-    G = nx.from_dict_of_lists(bonds)
-    return G, bonds
 
 
 class Main(pg.GraphicsLayoutWidget):
@@ -152,7 +59,6 @@ class Main(pg.GraphicsLayoutWidget):
             types,
         )
 
-        symbol_brushes = [BLUE_GREY] * len(nodes)
         self.graph.setData(
             pos=pos_arr,
             adj=adj,
@@ -160,8 +66,9 @@ class Main(pg.GraphicsLayoutWidget):
             symbol=symbols,
             pxMode=False,
             text=self.graph.get_text(),
-            symbolBrush=symbol_brushes,
+            atoms=self.qm_geom.atoms,
         )
+        self.graph.updateGraph()
 
     def set_geoms(self, qm_geom, ff_geom):
         self.qm_geom = qm_geom
@@ -200,7 +107,9 @@ class Main(pg.GraphicsLayoutWidget):
             self.ff_geom,
         )
         self.td.exec_()
-        log()
+        log("Term(s) after closing dialog:")
+        for i, term in enumerate(terms):
+            log(f"\t@@@ {i}: {' '.join([type_ for type_ in types])} {term}")
 
     def keyReleaseEvent(self, event):
         super().keyPressEvent(event)
@@ -209,6 +118,8 @@ class Main(pg.GraphicsLayoutWidget):
         stack = self.graph.stack
         if event.key() == SHIFT:
             self.graph.stack = list()
+            print("updated graph")
+            self.graph.updateGraph()
             if len(stack) > 1:
                 nodes = [self.inv_node_map[i] for i in stack]
                 self.show_term_dialog(nodes)
@@ -263,8 +174,8 @@ def run():
 
     mkQApp("Parameter Editor")
     main = Main()
-    main.set_charmm_resi(resi, top, params)
     main.set_geoms(qm_geom, ff_geom)
+    main.set_charmm_resi(resi, top, params)
     try:
         pg.exec()
     except Exception as err:
