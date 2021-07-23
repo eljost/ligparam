@@ -10,6 +10,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, mkQApp
 
 from ligparam.dialog import TermDialog
+from ligparam.helpers import log
 
 
 SHIFT = QtCore.Qt.Key_Shift
@@ -179,13 +180,13 @@ class Main(pg.GraphicsLayoutWidget):
         except KeyError:
             terms = func[types[::-1]]
 
-        print(types)
+        log(types)
         if not isinstance(terms, list):
             terms = [
                 terms,
             ]
         for i, term in enumerate(terms):
-            print(f"\t{i:02d}: {term}")
+            log(f"\t{i:02d}: {term}")
 
         indices = [self.node_map[node] for node in nodes]
         self.td = TermDialog(
@@ -199,7 +200,7 @@ class Main(pg.GraphicsLayoutWidget):
             self.ff_geom,
         )
         self.td.exec_()
-        print()
+        log()
 
     def keyReleaseEvent(self, event):
         super().keyPressEvent(event)
@@ -238,27 +239,27 @@ def run():
     qm_geom_fn = args.qm_geom_fn
 
     qm_geom = geom_loader(qm_geom_fn, coord_type="redund")
-    print(f"Loaded QM geometry from '{qm_geom_fn}'")
+    log(f"Loaded QM geometry from '{qm_geom_fn}'")
     if args.ff_geom_fn is None:
         ff_geom_fn = qm_geom_fn
     ff_geom = geom_loader(ff_geom_fn, coord_type="redund")
-    print(f"Loaded FF geometry from '{ff_geom_fn}'")
+    log(f"Loaded FF geometry from '{ff_geom_fn}'")
 
     param_fns = (
         "par_all36_cgenff.prm",
         "top_all36_cgenff.rtf",
         str_,
     )
-    print("Loading files using ParmEd:")
+    log("Loading files using ParmEd:")
     for i, fn in enumerate(param_fns):
-        print(f"\t{i:02d}: {fn}")
+        log(f"\t{i:02d}: {fn}")
     params = CharmmParameterSet(*param_fns)
     resis = params.residues
-    print(f"Found {len(resis)} residue(s)")
+    log(f"Found {len(resis)} residue(s)")
     resi = params.residues[resi_]
-    print(f"Chose residue '{resi}'")
+    log(f"Chose residue '{resi}'")
     top = CharmmPsfFile(psf)
-    print(f"Loaded {psf}")
+    log(f"Loaded {psf}")
 
     mkQApp("Parameter Editor")
     main = Main()
@@ -267,10 +268,10 @@ def run():
     try:
         pg.exec()
     except Exception as err:
-        print(err)
+        log(err)
     prm_fn = f"{resi_.lower()}_optimized.prm"
     dump_params(top, params, prm_fn)
-    print(f"Dumped optimized parameters to '{prm_fn}'")
+    log(f"Dumped optimized parameters to '{prm_fn}'")
 
 
 if __name__ == "__main__":

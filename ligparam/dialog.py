@@ -11,8 +11,8 @@ from pysisyphus.constants import AU2KJPERMOL, BOHR2ANG
 from pysisyphus.intcoords.PrimTypes import PrimTypes as PT
 from pysisyphus.run import run_scan, get_calc_closure
 from pysisyphus.optimizers.RFOptimizer import RFOptimizer
-from simtk.openmm import app
 
+from ligparam.helpers import log
 
 THIS_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
@@ -143,9 +143,8 @@ class TermDialog(QtGui.QDialog):
             self.ff_lines.append(line)
 
     def clear_ff_plot(self):
-        print("clear ff plot")
         for line in self.ff_lines:
-            print(line)
+            log(line)
             line.clear()
         self.ff_lines = list()
 
@@ -189,9 +188,9 @@ class TermDialog(QtGui.QDialog):
 
         # Update params with current values from TableWidget
         self.term_table.get_terms()
-        print("Using current terms:")
+        log("Using current terms:")
         for i, term in enumerate(self.terms):
-            print(f"\t{i:02d}: {term}")
+            log(f"\t{i:02d}: {term}")
 
         def calc_getter(**kwargs):
             calc = OpenMM(self.top, self.params, **kwargs)
