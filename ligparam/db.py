@@ -175,7 +175,9 @@ def init_db(db):
     db.create_tables([PrimCoord, AtomIndex, ScanPoint, Calculator])
 
     # Initialize Calculator table
-    calcs = Config["calculators"].keys()
+    calcs = list()
+    for key, (type_, _) in Config["calculators"].items():
+        calcs.append(type_)
     preset_calcs = set([calc.name for calc in Calculator.select()])
     missing_calcs = set(calcs) - preset_calcs
     for calc in missing_calcs:

@@ -98,8 +98,11 @@ class TermDialog(QtGui.QDialog):
 
         # self.calcs = Config["calculators"].copy()
         self.calcs = CALCULATORS.copy()
-        for key, value in self.calcs.items():
+        calc_levels = list()
+        for key, (type_, _) in self.calcs.items():
+            calc_levels.append(type_)
             self.calc_level.addItem(str(key))
+        self.calc_level.setCurrentIndex(calc_levels.index("psi4"))
 
         self.ff_label_default = "default"
         self.ff_label.setText(self.ff_label_default)
