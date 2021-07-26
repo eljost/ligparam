@@ -12,9 +12,12 @@ from pysisyphus.intcoords.PrimTypes import PrimTypes as PT
 from pysisyphus.run import run_scan, get_calc_closure
 from pysisyphus.optimizers.RFOptimizer import RFOptimizer
 
+from ligparam.config import Config
+from ligparam.db import select_or_insert_prim_coord, insert_scan, get_scan_data
 from ligparam.helpers import log
 
 THIS_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
+CALCULATORS = Config["calculators"].copy()
 
 
 class TermTable(pg.TableWidget):
@@ -93,14 +96,8 @@ class TermDialog(QtGui.QDialog):
         self.clear_ff.clicked.connect(self.clear_ff_plot)
         self.clear_all.clicked.connect(self.plot.clear)
 
-        self.calcs = {
-            "xtb": ("xtb", {}),
-            "ORCA": ("orca", {"keywords": "ri-mp2 6-31G* cc-pvdz/C"}),
-            "Psi4": (
-                "psi4",
-                {"method": "mp2", "basis": "6-31G*", "to_set": {"freeze_core": True}},
-            ),
-        }
+        # self.calcs = Config["calculators"].copy()
+        self.calcs = CALCULATORS.copy()
         for key, value in self.calcs.items():
             self.calc_level.addItem(str(key))
 
@@ -115,6 +112,7 @@ class TermDialog(QtGui.QDialog):
         self.prim_type = prim_types[len(nodes)]
         self.type_.setText(str(self.prim_type))
         self.prim_indices_le.setText(str(indices))
+        self.typed_prim = (self.prim_type, *indices)
 
         self.ff_scans = 0
         if self.prim_type == PT.BOND:
@@ -127,6 +125,15 @@ class TermDialog(QtGui.QDialog):
         self.step_unit.setText(unit)
         self.plot.addLegend()
         self.ff_lines = list()
+
+        # self.db_prim_coord = select_or_insert_prim_coord(self.typed_prim)
+        # print("DB PRIM COORD", self.db_prim_coord)
+        # Make PrimCoord available
+        select_or_insert_prim_coord(self.typed_prim)
+        _, calculator, _ = self.get_calc_data()
+        vals_, ens_ = get_scan_data(self.typed_prim, calculator)
+        if vals_.size > 0:
+            self.plot_qm(vals_, ens_, calculator)
 
     def update_plot(self, vals, ens, name, **plot_kwargs):
         vals = vals.copy()
@@ -158,10 +165,14 @@ class TermDialog(QtGui.QDialog):
         symmetric = self.symmetric.isChecked()
         return steps, step_size, symmetric
 
-    def run_qm_scan(self):
-        geom = self.qm_geom.copy()
+    def get_calc_data(self):
         calc_key = self.calc_level.currentText()
         calc_type, calc_kwargs = self.calcs[calc_key]
+        return calc_key, calc_type, calc_kwargs
+
+    def run_qm_scan(self):
+        geom = self.qm_geom.copy()
+        calc_key, calc_type, calc_kwargs = self.get_calc_data()
 
         calc_kwargs = calc_kwargs.copy()
         calc_kwargs["pal"] = psutil.cpu_count(logical=False)
@@ -178,6 +189,11 @@ class TermDialog(QtGui.QDialog):
             steps,
             step_size,
         )
+        # Insert into DB
+        insert_scan(self.typed_prim, calc_type, vals, ens)
+        self.plot_qm(vals, ens, calc_key)
+
+    def plot_qm(self, vals, ens, calc_key):
         pen = pg.mkPen((255, 0, 0))
         qm_label = f"QM_{calc_key}"
         self.update_plot(vals, ens, qm_label, pen=pen, symbol="x")

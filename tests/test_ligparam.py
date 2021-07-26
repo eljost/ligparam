@@ -5,7 +5,6 @@ from pyqtgraph.Qt import mkQApp
 import pyqtgraph as pg
 from pysisyphus.helpers import geom_loader
 
-from ligparam import __version__
 from ligparam.dialog import TermDialog
 
 
@@ -13,7 +12,8 @@ def test_dialog():
     mkQApp("dialog test")
     inp = "azb.str"
     # qm_geom = geom_loader("azb_mp2.crd", coord_type="redund")
-    qm_geom = geom_loader("azb_psi4_opt.xyz", coord_type="redund")
+    # qm_geom = geom_loader("azb_psi4_opt.xyz", coord_type="redund")
+    qm_geom = geom_loader("psi4_opt_direct/azb_psi4_opt.xyz", coord_type="redund")
     ff_geom = qm_geom.copy()
     param_fns = (
         "par_all36_cgenff.prm",
@@ -33,10 +33,6 @@ def test_dialog():
     bterms = [params.bond_types[btype]]
     bnodes = ("N1", "N2")
     binds = (6, 7)
-
-    atype = ("CG2R61", "CG2R61", "CG2R61")
-    aterms = [params.angle_types[atype]]
-    anodes = ("C5", "C4", "C3")
 
     dtype = ("CG2R61", "CG2R61", "NG2D1", "NG2D1")
     dterms = params.dihedral_types[dtype]

@@ -13,6 +13,8 @@ if __name__ == "__main__":
         # pyqt5
         # peewee
         # ParmEd
+        # psutil
+        # xdg
         entry_points={
             "console_scripts": [
                 "ligparam = ligparam.main:run",

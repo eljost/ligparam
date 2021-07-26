@@ -9,6 +9,7 @@ from pysisyphus.helpers import geom_loader
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, mkQApp
 
+from ligparam.config import get_config
 from ligparam.dialog import TermDialog
 from ligparam.helpers import log
 from ligparam.Graph import Graph
@@ -148,6 +149,8 @@ def run():
     psf = args.psf
     resi_ = args.resi
     qm_geom_fn = args.qm_geom_fn
+
+    conf = get_config()
 
     qm_geom = geom_loader(qm_geom_fn, coord_type="redund")
     log(f"Loaded QM geometry from '{qm_geom_fn}'")
