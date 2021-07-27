@@ -33,4 +33,8 @@ def get_db(fn=None):
     return db
 
 
+def get_toppar():
+    return Config["toppar"]
+
+
 Config = get_config()

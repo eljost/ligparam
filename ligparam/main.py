@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import re
 import sys
 
 import networkx as nx
@@ -9,9 +10,9 @@ from pysisyphus.helpers import geom_loader
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, mkQApp
 
-from ligparam.config import get_config
+from ligparam.config import get_config, get_toppar
 from ligparam.dialog import TermDialog
-from ligparam.helpers import log
+from ligparam.helpers import log, inc_fn
 from ligparam.Graph import Graph
 
 
@@ -128,7 +129,8 @@ class Main(pg.GraphicsLayoutWidget):
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument("str")
+    parser.add_argument("prm", help="CHARMM Parameter, either from .prm or .str file.")
+    parser.add_argument("rtf")
     parser.add_argument("psf")
     parser.add_argument("resi")
     parser.add_argument("qm_geom_fn")
@@ -145,7 +147,8 @@ def dump_params(top, params, prm_fn):
 
 def run():
     args = parse_args(sys.argv[1:])
-    str_ = args.str
+    prm = args.prm
+    rtf = args.rtf
     psf = args.psf
     resi_ = args.resi
     qm_geom_fn = args.qm_geom_fn
@@ -159,23 +162,22 @@ def run():
     ff_geom = geom_loader(ff_geom_fn, coord_type="redund")
     log(f"Loaded FF geometry from '{ff_geom_fn}'")
 
-    param_fns = (
-        "par_all36_cgenff.prm",
-        "top_all36_cgenff.rtf",
-        str_,
-    )
+    # )
+    param_fns = get_toppar() + [rtf, prm]#, rtf]
     log("Loading files using ParmEd:")
     for i, fn in enumerate(param_fns):
         log(f"\t{i:02d}: {fn}")
     params = CharmmParameterSet(*param_fns)
-    resis = params.residues
-    log(f"Found {len(resis)} residue(s)")
-    resi = params.residues[resi_]
-    log(f"Chose residue '{resi}'")
     top = CharmmPsfFile(psf)
     log(f"Loaded {psf}")
+    resis = params.residues
+    log("Charges will be read from the supplied .psf file!")
+    log(f"Found {len(resis)} residue(s)")
+    resi = resis[resi_]
+    log(f"Chose residue '{resi}'")
 
-    prm_backup_fn = Path(str_).with_suffix(".prm.backup")
+    prm_path = Path(prm)
+    prm_backup_fn = prm_path.with_suffix(".prm.backup")
     dump_params(top, params, prm_backup_fn)
     log(f"Dumped parameter backup to '{prm_backup_fn}'")
 
@@ -187,9 +189,15 @@ def run():
         pg.exec()
     except Exception as err:
         log(err)
-    prm_fn = f"{resi_.lower()}_optimized.prm"
-    dump_params(top, params, prm_fn)
-    log(f"Dumped optimized parameters to '{prm_fn}'")
+
+    inc_pattern = "_optimized.prm"
+    if inc_pattern not in prm:
+        prm_inc_fn = prm.replace(prm_path.suffix, f"_0{inc_pattern}")
+    else:
+        prm_inc_fn = prm
+    prm_inc_fn = inc_fn(prm_inc_fn, inc_pattern)
+    dump_params(top, params, prm_inc_fn)
+    log(f"Dumped optimized parameters to '{prm_inc_fn}'")
 
 
 if __name__ == "__main__":

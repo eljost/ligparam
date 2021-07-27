@@ -16,6 +16,7 @@ from ligparam.config import Config
 from ligparam.db import select_or_insert_prim_coord, insert_scan, get_scan_data
 from ligparam.helpers import log
 
+
 THIS_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 CALCULATORS = Config["calculators"].copy()
 
@@ -129,8 +130,6 @@ class TermDialog(QtGui.QDialog):
         self.plot.addLegend()
         self.ff_lines = list()
 
-        # self.db_prim_coord = select_or_insert_prim_coord(self.typed_prim)
-        # print("DB PRIM COORD", self.db_prim_coord)
         # Make PrimCoord available
         select_or_insert_prim_coord(self.typed_prim)
         _, calculator, _ = self.get_calc_data()
@@ -180,6 +179,7 @@ class TermDialog(QtGui.QDialog):
         calc_kwargs = calc_kwargs.copy()
         calc_kwargs["pal"] = psutil.cpu_count(logical=False)
         calc_kwargs["mem"] = 1500
+        calc_kwargs["out_dir"] = "qm_calcs"
         calc_getter = get_calc_closure("ligparam_scan", calc_type, calc_kwargs)
 
         steps, step_size, symmetric = self.get_scan_kwargs()
@@ -236,7 +236,6 @@ class TermDialog(QtGui.QDialog):
         if ff_label == self.ff_label_default:
             ff_label = f"FF_{self.ff_scans}"
 
-        # self.update_plot(vals, ens, f"FF_{self.ff_scans}", pen=pen, symbol="o")
         self.update_plot(vals, ens, ff_label, pen=pen, symbol="o", is_ff=True)
         self.ff_scans += 1
         self.ff_label.setText(self.ff_label_default)
