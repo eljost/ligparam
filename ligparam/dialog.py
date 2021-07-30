@@ -33,6 +33,21 @@ class TermTable(pg.TableWidget):
         kwargs["editable"] = True
         super().__init__(*args, **kwargs)
 
+        self.itemEntered.connect(self.item_entered)
+        self.itemPressed.connect(self.item_pressed)
+        self.itemSelectionChanged.connect(self.item_selection_changed)
+
+    def item_selection_changed(self):
+        cur_item = self.currentItem()
+        self.item_text_backup = cur_item.text()
+        print(f"saved {cur_item} text: {self.item_text_backup}")
+
+    def item_entered(self):
+        print("item entered")
+
+    def item_pressed(self):
+        print("item pressed")
+
     def set_terms(self, terms):
         self.terms = terms
         # BondType, AngleType or DihedralType
@@ -136,6 +151,22 @@ class TermDialog(QtGui.QDialog):
         vals_, ens_ = get_scan_data(self.typed_prim, calculator)
         if vals_.size > 0:
             self.plot_qm(vals_, ens_, calculator)
+
+        self.change_counter = 0
+        self.term_table.itemChanged.connect(self.item_changed)
+
+    def item_changed(self, item):
+        row = item.row()
+        col = item.column()
+        field = self.term_table.fields[col]
+        old_val = self.term_table.item_text_backup
+        new_val = item.text()
+        text = (
+            f"{self.change_counter:03d}: "
+            f"Updated {field} in row {row} from {old_val} to {new_val}"
+        )
+        self.term_history.appendPlainText(text)
+        self.change_counter += 1
 
     def update_plot(self, vals, ens, name, **plot_kwargs):
         vals = vals.copy()
