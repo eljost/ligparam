@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-import re
 import sys
 
 import networkx as nx
@@ -10,7 +9,7 @@ from pysisyphus.helpers import geom_loader
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, mkQApp
 
-from ligparam.config import get_config, get_toppar
+from ligparam.config import get_toppar
 from ligparam.dialog import TermDialog
 from ligparam.helpers import log, inc_fn
 from ligparam.Graph import Graph
@@ -153,8 +152,6 @@ def run():
     resi_ = args.resi
     qm_geom_fn = args.qm_geom_fn
 
-    conf = get_config()
-
     qm_geom = geom_loader(qm_geom_fn, coord_type="redund")
     log(f"Loaded QM geometry from '{qm_geom_fn}'")
     if args.ff_geom_fn is None:
@@ -162,8 +159,7 @@ def run():
     ff_geom = geom_loader(ff_geom_fn, coord_type="redund")
     log(f"Loaded FF geometry from '{ff_geom_fn}'")
 
-    # )
-    param_fns = get_toppar() + [rtf, prm]#, rtf]
+    param_fns = get_toppar() + [rtf, prm]
     log("Loading files using ParmEd:")
     for i, fn in enumerate(param_fns):
         log(f"\t{i:02d}: {fn}")
