@@ -30,7 +30,7 @@ class Main(pg.GraphicsLayoutWidget):
         self.graph = Graph()
         self.vb.addItem(self.graph)
 
-    def set_charmm_resi(self, resi, top, params):
+    def set_charmm_resi(self, resi, top=None, params=None):
         self.resi = resi
         self.top = top
         self.params = params
@@ -128,11 +128,11 @@ class Main(pg.GraphicsLayoutWidget):
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument("prm", help="CHARMM Parameter, either from .prm or .str file.")
     parser.add_argument("rtf")
-    parser.add_argument("psf")
     parser.add_argument("resi")
     parser.add_argument("qm_geom_fn")
+    parser.add_argument("--prm", help="CHARMM Parameter, either from .prm or .str file.")
+    parser.add_argument("--psf")
     parser.add_argument("--ff_geom_fn", default=None)
 
     return parser.parse_args(args)
@@ -146,36 +146,50 @@ def dump_params(top, params, prm_fn):
 
 def run():
     args = parse_args(sys.argv[1:])
-    prm = args.prm
     rtf = args.rtf
-    psf = args.psf
     resi_ = args.resi
+    prm = args.prm
+    psf = args.psf
     qm_geom_fn = args.qm_geom_fn
+    ff_geom_fn = args.ff_geom_fn
 
-    qm_geom = geom_loader(qm_geom_fn, coord_type="redund")
-    log(f"Loaded QM geometry from '{qm_geom_fn}'")
-    if args.ff_geom_fn is None:
-        ff_geom_fn = qm_geom_fn
-    ff_geom = geom_loader(ff_geom_fn, coord_type="redund")
-    log(f"Loaded FF geometry from '{ff_geom_fn}'")
-
-    param_fns = get_toppar() + [rtf, prm]
+    # Load rtf/prm files using ParmEd
+    param_fns = get_toppar() + [rtf]
+    if prm:
+        param_fns += [prm]
     log("Loading files using ParmEd:")
     for i, fn in enumerate(param_fns):
         log(f"\t{i:02d}: {fn}")
     params = CharmmParameterSet(*param_fns)
-    top = CharmmPsfFile(psf)
-    log(f"Loaded {psf}")
     resis = params.residues
-    log("Charges will be read from the supplied .psf file!")
     log(f"Found {len(resis)} residue(s)")
     resi = resis[resi_]
     log(f"Chose residue '{resi}'")
 
-    prm_path = Path(prm)
-    prm_backup_fn = prm_path.with_suffix(".prm.backup")
-    dump_params(top, params, prm_backup_fn)
-    log(f"Dumped parameter backup to '{prm_backup_fn}'")
+    # Load optimized QM geometry
+    qm_geom = None
+    if args.qm_geom_fn:
+        qm_geom = geom_loader(qm_geom_fn, coord_type="redund")
+        log(f"Loaded QM geometry from '{qm_geom_fn}'")
+        if ff_geom_fn is None:
+            ff_geom_fn = qm_geom_fn
+
+    ff_geom = None
+    if ff_geom_fn:
+        ff_geom = geom_loader(ff_geom_fn, coord_type="redund")
+        log(f"Loaded FF geometry from '{ff_geom_fn}'")
+
+    top = None
+    if psf:
+        top = CharmmPsfFile(psf)
+        log(f"Loaded {psf}")
+        log("Charges will be read from the supplied .psf file!")
+
+    if prm:
+        prm_path = Path(prm)
+        prm_backup_fn = prm_path.with_suffix(".prm.backup")
+        dump_params(top, params, prm_backup_fn)
+        log(f"Dumped parameter backup to '{prm_backup_fn}'")
 
     mkQApp("Parameter Editor")
     main = Main()
