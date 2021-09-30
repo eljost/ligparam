@@ -32,11 +32,12 @@ def inc_fn(fn, pattern):
         counter = 0
         sub = False
 
+    fmt = "03d"
     while True:
         if sub:
-            fn_inc = regex.sub(f"{counter}{pattern}", fn)
+            fn_inc = regex.sub(f"{counter:{fmt}}{pattern}", fn)
         else:
-            fn_inc = fn + f".{counter}"
+            fn_inc = fn + f".{counter:{fmt}}"
         counter += 1
         if not Path(fn_inc).exists():
             break

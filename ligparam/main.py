@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -139,7 +140,9 @@ def parse_args(args):
     parser.add_argument("rtf")
     parser.add_argument("resi")
     parser.add_argument("qm_geom_fn")
-    parser.add_argument("--prm", help="CHARMM Parameter, either from .prm or .str file.")
+    parser.add_argument(
+        "--prm", help="CHARMM Parameter, either from .prm or .str file."
+    )
     parser.add_argument("--psf")
     parser.add_argument("--ff_geom_fn", default=None)
 
@@ -194,7 +197,7 @@ def run():
         log("Charges will be read from the supplied .psf file!")
 
     if prm:
-        prm_path = Path(prm)
+        prm_path = Path(prm).resolve()
         prm_backup_fn = prm_path.with_suffix(".prm.backup")
         dump_params(top, params, prm_backup_fn)
         log(f"Dumped parameter backup to '{prm_backup_fn}'")
@@ -214,13 +217,24 @@ def run():
 
     if main.term_diag_called:
         inc_pattern = "_optimized.prm"
-        if inc_pattern not in prm:
-            prm_inc_fn = prm.replace(prm_path.suffix, f"_0{inc_pattern}")
+        if inc_pattern in str(prm_path):
+            prm_inc_fn = prm_path
         else:
-            prm_inc_fn = prm
+            prm_inc_fn = str(prm_path).replace(prm_path.suffix, f"_0{inc_pattern}")
         prm_inc_fn = inc_fn(prm_inc_fn, inc_pattern)
         dump_params(top, params, prm_inc_fn)
         log(f"Dumped optimized parameters to '{prm_inc_fn}'")
+        latest_prm_src = prm_inc_fn
+    else:
+        latest_prm_src = prm_path
+
+    latest_prm = prm_path.with_name("latest.prm")
+    try:
+        os.unlink(str(latest_prm))
+    except FileNotFoundError:
+        pass
+    os.symlink(latest_prm_src, latest_prm)
+    log(f"Created symlink '{latest_prm}'")
 
 
 if __name__ == "__main__":
