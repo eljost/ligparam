@@ -83,11 +83,17 @@ class Main(pg.GraphicsLayoutWidget):
             4: self.params.dihedral_types,
         }
         types = tuple([self.type_map[node] for node in nodes])
+        rev_types = types[::-1]
         func = funcs[len(types)]
         try:
             terms = func[types]
         except KeyError:
-            terms = func[types[::-1]]
+            # Try reverse order
+            try:
+                terms = func[rev_types]
+            except KeyError:
+                print(f"No parameters found for types '{types}'/'{rev_types}'!")
+                return
 
         log(types)
         if not isinstance(terms, list):
@@ -199,6 +205,10 @@ def run():
         pg.exec()
     except Exception as err:
         log(err)
+
+    # Only continue when topolgy and parameters were given
+    if not (prm and psf):
+        return
 
     inc_pattern = "_optimized.prm"
     if inc_pattern not in prm:

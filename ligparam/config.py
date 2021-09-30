@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from peewee import SqliteDatabase
 from xdg import xdg_config_home
@@ -33,8 +34,29 @@ def get_db(fn=None):
     return db
 
 
+TOPPAR_FNS = (
+    "top_all36_prot.rtf",
+    "par_all36m_prot.prm",
+    "top_all36_carb.rtf",
+    "par_all36_carb.prm",
+    "top_all36_na.rtf",
+    "par_all36_na.prm",
+    "toppar_water_ions.str",
+    "top_all36_cgenff.rtf",
+    "par_all36_cgenff.prm",
+)
+
+
 def get_toppar():
-    return Config["toppar"]
+    # First, try to load from TOPPAR variable
+    try:
+        toppar_path = Path(os.environ["TOPPAR"])
+        param_fns = [
+            str(tp_fn) for fn in TOPPAR_FNS if (tp_fn := toppar_path / fn).exists()
+        ]
+    except KeyError:
+        param_fns = Config["toppar"]
+    return param_fns
 
 
 Config = get_config()
