@@ -13,11 +13,11 @@ PG_UP = QtCore.Qt.Key_PageUp
 ATOM_COLORS = {
     "h": color((255, 255, 255)),
     "c": color((133, 133, 133)),
-    "o": color((255, 0, 0,)),
+    "o": color((255, 0, 0)),
     "n": color((0, 0, 255)),
     "s": color((255, 255, 0)),
 }
-MAGENTA  = color((255, 0, 255))
+MAGENTA = color((255, 0, 255))
 
 
 class Graph(pg.GraphItem):

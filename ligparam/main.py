@@ -6,9 +6,9 @@ import sys
 import networkx as nx
 import numpy as np
 from parmed.charmm import CharmmParameterSet, CharmmPsfFile
-from pysisyphus.helpers import geom_loader
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, mkQApp
+from pysisyphus.helpers import geom_loader
 
 from ligparam.config import get_toppar
 from ligparam.dialog import TermDialog
