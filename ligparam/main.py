@@ -30,7 +30,7 @@ class Main(pg.GraphicsLayoutWidget):
         self.vb.setAspectLocked()
         self.graph = Graph()
         self.vb.addItem(self.graph)
-        self.term_diag_called = False
+        self.param_updated = False
 
     def set_charmm_resi(self, resi, top=None, params=None):
         self.resi = resi
@@ -120,7 +120,7 @@ class Main(pg.GraphicsLayoutWidget):
         log("Term(s) after closing dialog:")
         for i, term in enumerate(terms):
             log(f"\t@@@ {i}: {' '.join([type_ for type_ in types])} {term}")
-        self.term_diag_called = True
+        self.param_updated = self.td.param_updated or self.param_updated
 
     def keyReleaseEvent(self, event):
         super().keyPressEvent(event)
@@ -215,7 +215,7 @@ def run():
     if not (prm and psf):
         return
 
-    if main.term_diag_called:
+    if main.param_updated:
         inc_pattern = "_optimized.prm"
         if inc_pattern in str(prm_path):
             prm_inc_fn = prm_path

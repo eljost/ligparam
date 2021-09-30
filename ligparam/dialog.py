@@ -118,7 +118,7 @@ class TermDialog(QtGui.QDialog):
         for key, (type_, _) in self.calcs.items():
             calc_levels.append(type_)
             self.calc_level.addItem(str(key))
-        self.calc_level.setCurrentIndex(calc_levels.index("psi4"))
+        self.calc_level.setCurrentIndex(calc_levels.index("orca5"))
 
         self.ff_label_default = "default"
         self.ff_label.setText(self.ff_label_default)
@@ -144,6 +144,7 @@ class TermDialog(QtGui.QDialog):
         self.step_unit.setText(unit)
         self.plot.addLegend()
         self.ff_lines = list()
+        self.param_updated = False
 
         # Make PrimCoord available
         select_or_insert_prim_coord(self.typed_prim)
@@ -167,6 +168,7 @@ class TermDialog(QtGui.QDialog):
         )
         self.term_history.appendPlainText(text)
         self.change_counter += 1
+        self.param_updated = True
 
     def update_plot(self, vals, ens, name, **plot_kwargs):
         vals = vals.copy()
