@@ -33,20 +33,13 @@ class TermTable(pg.TableWidget):
         kwargs["editable"] = True
         super().__init__(*args, **kwargs)
 
-        self.itemEntered.connect(self.item_entered)
-        self.itemPressed.connect(self.item_pressed)
         self.itemSelectionChanged.connect(self.item_selection_changed)
+        self.setFormat("%.4f")
 
     def item_selection_changed(self):
         cur_item = self.currentItem()
         self.item_text_backup = cur_item.text()
         print(f"saved {cur_item} text: {self.item_text_backup}")
-
-    def item_entered(self):
-        print("item entered")
-
-    def item_pressed(self):
-        print("item pressed")
 
     def set_terms(self, terms):
         self.terms = terms

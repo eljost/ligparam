@@ -103,7 +103,7 @@ class Main(pg.GraphicsLayoutWidget):
                 terms,
             ]
         for i, term in enumerate(terms):
-            log(f"\t{i:02d}: {term}")
+            log(f"\t@@@{i:02d}: {term}")
 
         indices = [self.node_map[node] for node in nodes]
         self.td = TermDialog(
@@ -167,7 +167,8 @@ def run():
     # Load rtf/prm files using ParmEd
     param_fns = get_toppar() + [rtf]
     if prm:
-        param_fns += [prm]
+        prm_path = Path(prm).resolve()
+        param_fns += [str(prm_path)]
     log("Loading files using ParmEd:")
     for i, fn in enumerate(param_fns):
         log(f"\t{i:02d}: {fn}")
@@ -197,7 +198,6 @@ def run():
         log("Charges will be read from the supplied .psf file!")
 
     if prm:
-        prm_path = Path(prm).resolve()
         prm_backup_fn = prm_path.with_suffix(".prm.backup")
         dump_params(top, params, prm_backup_fn)
         log(f"Dumped parameter backup to '{prm_backup_fn}'")
