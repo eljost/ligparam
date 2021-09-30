@@ -29,6 +29,7 @@ class Main(pg.GraphicsLayoutWidget):
         self.vb.setAspectLocked()
         self.graph = Graph()
         self.vb.addItem(self.graph)
+        self.term_diag_called = False
 
     def set_charmm_resi(self, resi, top=None, params=None):
         self.resi = resi
@@ -118,6 +119,7 @@ class Main(pg.GraphicsLayoutWidget):
         log("Term(s) after closing dialog:")
         for i, term in enumerate(terms):
             log(f"\t@@@ {i}: {' '.join([type_ for type_ in types])} {term}")
+        self.term_diag_called = True
 
     def keyReleaseEvent(self, event):
         super().keyPressEvent(event)
@@ -210,14 +212,15 @@ def run():
     if not (prm and psf):
         return
 
-    inc_pattern = "_optimized.prm"
-    if inc_pattern not in prm:
-        prm_inc_fn = prm.replace(prm_path.suffix, f"_0{inc_pattern}")
-    else:
-        prm_inc_fn = prm
-    prm_inc_fn = inc_fn(prm_inc_fn, inc_pattern)
-    dump_params(top, params, prm_inc_fn)
-    log(f"Dumped optimized parameters to '{prm_inc_fn}'")
+    if main.term_diag_called:
+        inc_pattern = "_optimized.prm"
+        if inc_pattern not in prm:
+            prm_inc_fn = prm.replace(prm_path.suffix, f"_0{inc_pattern}")
+        else:
+            prm_inc_fn = prm
+        prm_inc_fn = inc_fn(prm_inc_fn, inc_pattern)
+        dump_params(top, params, prm_inc_fn)
+        log(f"Dumped optimized parameters to '{prm_inc_fn}'")
 
 
 if __name__ == "__main__":
