@@ -1,5 +1,7 @@
+from copy import copy
 import os
 from pathlib import Path
+import shutil
 
 import numpy as np
 from parmed.topologyobjects import BondType, AngleType, DihedralType
@@ -79,6 +81,17 @@ def run_scan_wrapper(geom, calc_getter, type_, indices, symmetric, steps, step_s
 
 
 class TermDialog(QtGui.QDialog):
+    prim_types = {
+        2: PT.BOND,
+        3: PT.BEND,
+        4: PT.PROPER_DIHEDRAL,
+    }
+    prim_type_abbrevs = {
+        PT.BOND: "B",
+        PT.BEND: "A",
+        PT.PROPER_DIHEDRAL: "D",
+    }
+
     def __init__(
         self, nodes, types, terms, indices, top, params, qm_geom, ff_geom, **kwargs
     ):
@@ -93,6 +106,8 @@ class TermDialog(QtGui.QDialog):
         self.params = params
         self.qm_geom = qm_geom
         self.ff_geom = ff_geom
+        self.atoms = copy(self.qm_geom.atoms)
+        self.scan_atoms = [self.atoms[i] for i in self.indices]
 
         dbl_validator = QtGui.QDoubleValidator(self)
         self.step_size.setValidator(dbl_validator)
@@ -116,15 +131,16 @@ class TermDialog(QtGui.QDialog):
         self.ff_label_default = "default"
         self.ff_label.setText(self.ff_label_default)
 
-        prim_types = {
-            2: PT.BOND,
-            3: PT.BEND,
-            4: PT.PROPER_DIHEDRAL,
-        }
-        self.prim_type = prim_types[len(nodes)]
+        self.prim_type = self.prim_types[len(nodes)]
         self.type_.setText(str(self.prim_type))
         self.prim_indices_le.setText(str(indices))
         self.typed_prim = (self.prim_type, *indices)
+        self.prim_type_abbrev = self.prim_type_abbrevs[self.prim_type]
+
+        self.scan_str = "_".join(
+            [self.prim_type_abbrev]
+            + [f"{sa}{i+1:03d}" for i, sa in zip(self.indices, self.scan_atoms)]
+        )
 
         self.ff_scans = 0
         if self.prim_type == PT.BOND:
@@ -157,7 +173,7 @@ class TermDialog(QtGui.QDialog):
         new_val = item.text()
         text = (
             f"{self.change_counter:03d}: "
-            f"Updated {field} in row {row} from {old_val} to {new_val}"
+            f"Updated {field} in row {row+1} from {old_val} to {new_val}"
         )
         self.term_history.appendPlainText(text)
         self.change_counter += 1
@@ -198,6 +214,13 @@ class TermDialog(QtGui.QDialog):
         calc_type, calc_kwargs = self.calcs[calc_key]
         return calc_key, calc_type, calc_kwargs
 
+    def copy_rlx_scan_trj(self, prefix):
+        try:
+            rlx_fn = "relaxed_scan.trj"
+            shutil.copy(rlx_fn, f"{self.scan_str}_{prefix}_{rlx_fn}")
+        except FileNotFoundError:
+            log(f"Could not find '{rlx_fn}'!")
+
     def run_qm_scan(self):
         geom = self.qm_geom.copy()
         calc_key, calc_type, calc_kwargs = self.get_calc_data()
@@ -218,6 +241,7 @@ class TermDialog(QtGui.QDialog):
             steps,
             step_size,
         )
+        self.copy_rlx_scan_trj("qm")
         # Insert into DB
         insert_scan(self.typed_prim, calc_type, vals, ens)
         self.plot_qm(vals, ens, calc_key)
@@ -256,6 +280,7 @@ class TermDialog(QtGui.QDialog):
             steps,
             step_size,
         )
+        self.copy_rlx_scan_trj("ff")
         self.setStatusTip("Relaxed scan finished")
         pen = pg.mkPen((0, 255, 0))
         ff_label = self.ff_label.text()
