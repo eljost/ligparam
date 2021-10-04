@@ -1,13 +1,16 @@
 from copy import copy
+from functools import partial
 import os
 from pathlib import Path
 import shutil
+import time
 
 import numpy as np
 from parmed.topologyobjects import BondType, AngleType, DihedralType
 import psutil
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, uic
+from pyqtgraph.Qt.QtCore import QObject, QThread, pyqtSignal
 from pysisyphus.calculators.OpenMM import OpenMM
 from pysisyphus.constants import AU2KJPERMOL, BOHR2ANG
 from pysisyphus.intcoords.PrimTypes import PrimTypes as PT
@@ -65,7 +68,9 @@ class TermTable(pg.TableWidget):
                 setattr(self.terms[i], attr, conv(data))
 
 
-def run_scan_wrapper(geom, calc_getter, type_, indices, symmetric, steps, step_size):
+def run_scan_wrapper(
+    geom, calc_getter, type_, indices, symmetric, steps, step_size, callback=None
+):
     scan_kwargs = {
         "type": type_,
         "indices": indices,
@@ -77,7 +82,47 @@ def run_scan_wrapper(geom, calc_getter, type_, indices, symmetric, steps, step_s
             "thresh": "gau_loose",
         },
     }
-    return run_scan(geom, calc_getter, scan_kwargs)
+    return run_scan(geom, calc_getter, scan_kwargs, callback)
+
+
+class Scanner(QObject):
+    progress = pyqtSignal(int, float, float)
+
+    def __init__(self, func, steps):
+        super().__init__()
+        self.func = func
+        self.steps = steps
+
+    def get_scan_callback(self, steps):
+        prev_time = time.time()
+        tot_time = 0.0
+        cur_step = 0
+        tot_steps = 2 * steps + 1
+
+        def scan_callback(*args):
+            nonlocal prev_time
+            nonlocal tot_time
+            nonlocal cur_step
+
+            cur_time = time.time()
+            dur = cur_time - prev_time
+            tot_time += dur
+            prev_time = cur_time
+
+            cur_step += 1
+            progress = cur_step / tot_steps
+            dur_per_step = tot_time / cur_step
+            est_s = dur_per_step * (tot_steps - cur_step)
+            est_min = est_s / 60
+            self.progress.emit(cur_step, progress, est_min)
+
+        return scan_callback
+
+    def run(self):
+        geoms, vals, ens = self.func(callback=self.get_scan_callback(self.steps))
+        self.geoms = geoms
+        self.vals = vals
+        self.ens = ens
 
 
 class TermDialog(QtGui.QDialog):
@@ -221,7 +266,20 @@ class TermDialog(QtGui.QDialog):
         except FileNotFoundError:
             log(f"Could not find '{rlx_fn}'!")
 
+    def report_progress(self, cur_step, progress, est_min):
+        msg = f"Progress ({progress:>8.2%}), {est_min:>6.2f} min remaining"
+        self.term_history.appendPlainText(msg)
+
+    def qm_scan_callback(self, opt_result):
+        from PyQt5.QtWidgets import QDialog
+
+        qd = QDialog(windowTitle="Hallo!")
+        print(opt_result)
+        qd.exec()
+
     def run_qm_scan(self):
+        self.thread = QThread()
+
         geom = self.qm_geom.copy()
         calc_key, calc_type, calc_kwargs = self.get_calc_data()
 
@@ -232,7 +290,8 @@ class TermDialog(QtGui.QDialog):
         calc_getter = get_calc_closure("ligparam_scan", calc_type, calc_kwargs)
 
         steps, step_size, symmetric = self.get_scan_kwargs()
-        geoms, vals, ens = run_scan_wrapper(
+        func = partial(
+            run_scan_wrapper,
             geom,
             calc_getter,
             self.prim_type,
@@ -241,6 +300,12 @@ class TermDialog(QtGui.QDialog):
             steps,
             step_size,
         )
+        self.scanner = Scanner(func, steps)
+        self.scanner.moveToThread(self.thread)
+        self.thread.started.connect(self.scanner.run)
+        self.scanner.progress.connect(self.report_progress)
+        self.thread.start()
+
         self.copy_rlx_scan_trj("qm")
         # Insert into DB
         insert_scan(self.typed_prim, calc_type, vals, ens)
@@ -269,6 +334,9 @@ class TermDialog(QtGui.QDialog):
         geom.set_calculator(calc_getter())
         opt = RFOptimizer(geom, thresh="gau", max_cycles=150)
         opt.run()
+
+        assert opt.is_converged
+        self.ff_geom = geom.copy()
 
         steps, step_size, symmetric = self.get_scan_kwargs()
         geoms, vals, ens = run_scan_wrapper(
