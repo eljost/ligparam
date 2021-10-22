@@ -13,7 +13,7 @@ from pyqtgraph.Qt import QtGui, uic
 from pyqtgraph.Qt.QtCore import QObject, QThread, pyqtSignal
 from pysisyphus.calculators.OpenMM import OpenMM
 from pysisyphus.constants import AU2KJPERMOL, BOHR2ANG
-from pysisyphus.intcoords.PrimTypes import PrimTypes as PT
+from pysisyphus.intcoords.PrimTypes import PrimTypes as PT, Stretch, Bend, Torsion
 from pysisyphus.run import run_scan, get_calc_closure
 from pysisyphus.optimizers.RFOptimizer import RFOptimizer
 
@@ -140,6 +140,11 @@ class TermDialog(QtGui.QDialog):
         PT.BEND: "A",
         PT.PROPER_DIHEDRAL: "D",
     }
+    prims = {
+        PT.BOND: Stretch,
+        PT.BEND: Bend,
+        PT.PROPER_DIHEDRAL: Torsion,
+    }
 
     def __init__(
         self, nodes, types, terms, indices, top, params, qm_geom, ff_geom, **kwargs
@@ -170,7 +175,6 @@ class TermDialog(QtGui.QDialog):
         # Disable right now, as this would also delete self.qm_line
         # self.clear_all.clicked.connect(self.plot.clear)
 
-        # self.calcs = Config["calculators"].copy()
         self.calcs = CALCULATORS.copy()
         calc_levels = list()
         for key, (type_, _) in self.calcs.items():
@@ -186,6 +190,7 @@ class TermDialog(QtGui.QDialog):
         self.prim_indices_le.setText(str(indices))
         self.typed_prim = (self.prim_type, *indices)
         self.prim_type_abbrev = self.prim_type_abbrevs[self.prim_type]
+        self.prim = self.prims[self.prim_type](indices=indices)
 
         self.scan_str = "_".join(
             [self.prim_type_abbrev]
@@ -200,7 +205,10 @@ class TermDialog(QtGui.QDialog):
             step_size = 5
             unit = "deg"
         self.step_size.setText(str(step_size))
-        self.step_unit.setText(unit)
+        for label in (self.step_unit, self.qm_val_unit, self.ff_val_unit):
+            label.setText(unit)
+        self.qm_val = self.convert_val(self.prim.calculate(self.qm_geom.coords3d))
+        self.qm_val_le.setText(f"{self.qm_val:.4f}")
 
         self.plot.addLegend()
         self.ff_lines = list()
@@ -218,6 +226,12 @@ class TermDialog(QtGui.QDialog):
 
         self.change_counter = 0
         self.term_table.itemChanged.connect(self.item_changed)
+
+    def convert_val(self, val):
+        if self.prim_type == PT.BOND:
+            return val * BOHR2ANG
+        else:
+            return np.rad2deg(val)
 
     def convert_scan_data(self, vals, ens):
         vals = vals.copy()
@@ -347,6 +361,8 @@ class TermDialog(QtGui.QDialog):
         geom.set_calculator(calc_getter())
         opt = RFOptimizer(geom, thresh="gau", max_cycles=150)
         opt.run()
+        ff_val = self.convert_val(self.prim.calculate(geom.coords3d))
+        self.ff_val_le.setText(f"{ff_val:.4f}")
 
         assert opt.is_converged
         self.ff_geom = geom.copy()
