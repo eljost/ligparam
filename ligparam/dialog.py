@@ -87,11 +87,14 @@ def run_scan_wrapper(
 
 class Scanner(QObject):
     progress = pyqtSignal(int, float, float)
+    scan_finished = pyqtSignal()
 
-    def __init__(self, func, steps):
+    def __init__(self, func, steps, calc_key, calc_type):
         super().__init__()
         self.func = func
         self.steps = steps
+        self.calc_key = calc_key
+        self.calc_type = calc_type
 
     def get_scan_callback(self, steps):
         prev_time = time.time()
@@ -123,6 +126,7 @@ class Scanner(QObject):
         self.geoms = geoms
         self.vals = vals
         self.ens = ens
+        self.scan_finished.emit()
 
 
 class TermDialog(QtGui.QDialog):
@@ -163,7 +167,8 @@ class TermDialog(QtGui.QDialog):
         self.run_ff.clicked.connect(self.run_ff_scan)
         self.run_ff.setDefault(True)
         self.clear_ff.clicked.connect(self.clear_ff_plot)
-        self.clear_all.clicked.connect(self.plot.clear)
+        # Disable right now, as this would also delete self.qm_line
+        # self.clear_all.clicked.connect(self.plot.clear)
 
         # self.calcs = Config["calculators"].copy()
         self.calcs = CALCULATORS.copy()
@@ -196,19 +201,43 @@ class TermDialog(QtGui.QDialog):
             unit = "deg"
         self.step_size.setText(str(step_size))
         self.step_unit.setText(unit)
+
         self.plot.addLegend()
         self.ff_lines = list()
+        self.qm_line = pg.PlotDataItem(clear=True, pen="r", symbol="o", name="QM")
+        self.plot.addItem(self.qm_line)
+        self.legend = self.plot.addLegend()
         self.param_updated = False
 
         # Make PrimCoord available
         select_or_insert_prim_coord(self.typed_prim)
-        _, calculator, _ = self.get_calc_data()
-        vals_, ens_ = get_scan_data(self.typed_prim, calculator)
-        if vals_.size > 0:
-            self.plot_qm(vals_, ens_, calculator)
+        # Update plot when calculate is changed
+        self.calc_level.currentTextChanged.connect(self.plot_qm)
+        # See if we already have data from a previous run
+        self.plot_qm()
 
         self.change_counter = 0
         self.term_table.itemChanged.connect(self.item_changed)
+
+    def convert_scan_data(self, vals, ens):
+        vals = vals.copy()
+        if self.prim_type == PT.BOND:
+            vals *= BOHR2ANG
+        else:
+            vals = np.rad2deg(vals)
+
+        ens = ens.copy()
+        try:
+            ens -= ens.min()
+            ens *= AU2KJPERMOL
+        except ValueError:
+            pass
+        return vals, ens
+
+    def plot_qm(self):
+        _, calculator, _ = self.get_calc_data()
+        vals, ens = self.convert_scan_data(*get_scan_data(self.typed_prim, calculator))
+        self.qm_line.setData(vals, ens)
 
     def item_changed(self, item):
         row = item.row()
@@ -224,24 +253,11 @@ class TermDialog(QtGui.QDialog):
         self.change_counter += 1
         self.param_updated = True
 
-    def update_plot(self, vals, ens, name, **plot_kwargs):
-        vals = vals.copy()
-        if self.prim_type == PT.BOND:
-            vals *= BOHR2ANG
-        else:
-            vals = np.rad2deg(vals)
-        ens = ens.copy()
-        ens -= ens.min()
-        ens *= AU2KJPERMOL
-        is_ff = plot_kwargs.pop("is_ff", False)
-        line = self.plot.plot(vals, ens, name=name, **plot_kwargs)
-        if is_ff:
-            self.ff_lines.append(line)
-
     def clear_ff_plot(self):
         for line in self.ff_lines:
             log(line)
-            line.clear()
+            self.plot.removeItem(line)
+            self.legend.removeItem(line)
         self.ff_lines = list()
 
     def get_scan_kwargs(self):
@@ -270,13 +286,6 @@ class TermDialog(QtGui.QDialog):
         msg = f"Progress ({progress:>8.2%}), {est_min:>6.2f} min remaining"
         self.term_history.appendPlainText(msg)
 
-    def qm_scan_callback(self, opt_result):
-        from PyQt5.QtWidgets import QDialog
-
-        qd = QDialog(windowTitle="Hallo!")
-        print(opt_result)
-        qd.exec()
-
     def run_qm_scan(self):
         self.thread = QThread()
 
@@ -300,23 +309,27 @@ class TermDialog(QtGui.QDialog):
             steps,
             step_size,
         )
-        self.scanner = Scanner(func, steps)
+        self.scanner = Scanner(func, steps, calc_key, calc_type)
         self.scanner.moveToThread(self.thread)
         self.thread.started.connect(self.scanner.run)
+        # Insert into DB and plot
+        self.scanner.scan_finished.connect(self.on_qm_scan_finished)
+        # Stop parent thread
+        self.scanner.scan_finished.connect(self.thread.quit)
+        # Report progress
         self.scanner.progress.connect(self.report_progress)
         self.thread.start()
 
+    def on_qm_scan_finished(self):
         self.copy_rlx_scan_trj("qm")
+        scan = self.scanner
         # Insert into DB
-        insert_scan(self.typed_prim, calc_type, vals, ens)
-        self.plot_qm(vals, ens, calc_key)
-
-    def plot_qm(self, vals, ens, calc_key):
-        pen = pg.mkPen((255, 0, 0))
-        qm_label = f"QM_{calc_key}"
-        self.update_plot(vals, ens, qm_label, pen=pen, symbol="x")
+        insert_scan(self.typed_prim, scan.calc_type, scan.vals, scan.ens)
+        # and plot
+        self.plot_qm()
 
     def run_ff_scan(self):
+        # In contrast to run_qm_scan this blocks, as it should not take too long
         geom = self.ff_geom.copy()
         self.top.coordinates = geom.coords3d * BOHR2ANG
 
@@ -348,13 +361,15 @@ class TermDialog(QtGui.QDialog):
             steps,
             step_size,
         )
+        self.ff_scans += 1
         self.copy_rlx_scan_trj("ff")
         self.setStatusTip("Relaxed scan finished")
         pen = pg.mkPen((0, 255, 0))
         ff_label = self.ff_label.text()
+        # Append current scan number to default label; otherwise use as is.
         if ff_label == self.ff_label_default:
             ff_label = f"FF_{self.ff_scans}"
 
-        self.update_plot(vals, ens, ff_label, pen=pen, symbol="o", is_ff=True)
-        self.ff_scans += 1
-        self.ff_label.setText(self.ff_label_default)
+        vals, ens = self.convert_scan_data(vals, ens)
+        line = self.plot.plot(vals, ens, name=ff_label, pen=pen, symbol="o")
+        self.ff_lines.append(line)
