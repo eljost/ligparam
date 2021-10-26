@@ -297,7 +297,7 @@ class TermDialog(QtGui.QDialog):
             log(f"Could not find '{rlx_fn}'!")
 
     def report_progress(self, cur_step, progress, est_min):
-        msg = f"Progress ({progress:>8.2%}), {est_min:>6.2f} min remaining"
+        msg = f"{progress:>8.2%} done, {est_min:>6.2f} min left"
         self.term_history.appendPlainText(msg)
 
     def run_qm_scan(self):
