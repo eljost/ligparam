@@ -343,7 +343,8 @@ class TermDialog(QtGui.QDialog):
         self.plot_qm()
 
     def run_ff_scan(self):
-        # In contrast to run_qm_scan this blocks, as it should not take too long
+        # In contrast to run_qm_scan we let this block, as it should not
+        # take too long
         geom = self.ff_geom.copy()
         self.top.coordinates = geom.coords3d * BOHR2ANG
 
@@ -383,7 +384,7 @@ class TermDialog(QtGui.QDialog):
         pen = pg.mkPen((0, 255, 0))
         ff_label = self.ff_label.text()
         # Append current scan number to default label; otherwise use as is.
-        if ff_label == self.ff_label_default:
+        if ff_label in (self.ff_label_default, ""):
             ff_label = f"FF_{self.ff_scans}"
 
         vals, ens = self.convert_scan_data(vals, ens)

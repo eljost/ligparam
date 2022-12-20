@@ -8,8 +8,8 @@ authors = ["Johannes Steinmetzer <josteinm@posteo.de>"]
 python = "^3.9"
 ParmEd = "^3.2.0"
 pyqtgraph = "^0.12.2"
-#  pysisyphus = { git = "https://github.com/eljost/pysisyphus.git" }
-pysisyphus = { path = "../pysisyphus", develop = true }
+pysisyphus = { git = "https://github.com/eljost/pysisyphus.git" }
+#pysisyphus = { path = "../pysisyphus", develop = true }
 networkx = "^2.6.1"
 PyQt5 = "^5.15.4"
 numpy = "^1.21.1"

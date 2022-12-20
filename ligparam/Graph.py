@@ -16,6 +16,8 @@ ATOM_COLORS = {
     "o": color((255, 0, 0)),
     "n": color((0, 0, 255)),
     "s": color((255, 255, 0)),
+    "cl": color((0, 255, 0)),
+    "x": color((87, 72, 53)),
 }
 MAGENTA = color((255, 0, 255))
 
@@ -71,7 +73,14 @@ class Graph(pg.GraphItem):
             item.setPos(*self.data["pos"][i])
 
     def get_symbol_brushes(self):
-        symbol_brushes = [ATOM_COLORS[atom.lower()] for atom in self.data["atoms"]]
+        symbol_brushes = list()
+        for atom in self.data["atoms"]:
+            try:
+                brush = ATOM_COLORS[atom.lower()]
+            except KeyError:
+                brush = ATOM_COLORS["x"]
+            symbol_brushes.append(brush)
+        # symbol_brushes = [ATOM_COLORS[atom.lower()] for atom in self.data["atoms"]]
         for i in self.stack:
             symbol_brushes[i] = MAGENTA
         return symbol_brushes

@@ -54,7 +54,10 @@ class Main(pg.GraphicsLayoutWidget):
         adj = np.array(adj, dtype=int)
 
         symbols = ["o" for n in nodes]
-        charges = [atom.charge for atom in atoms]
+        if top is not None:
+            charges = [atom.charge for atom in top.atoms]
+        else:
+            charges = [atom.charge for atom in atoms]
         types = [atom.type for atom in atoms]
 
         self.graph.texts = (
@@ -63,6 +66,16 @@ class Main(pg.GraphicsLayoutWidget):
             types,
         )
 
+        graph_atoms = self.qm_geom.atoms
+        resi_atom_num = len(atoms)
+        graph_atom_num = len(graph_atoms)
+        if resi_atom_num != graph_atom_num:
+            assert resi_atom_num > graph_atom_num
+            # Append missing atoms
+            missing_indices = np.arange(resi_atom_num - graph_atom_num) + graph_atom_num
+            missing_atom_names = tuple([atoms[i].name for i in missing_indices])
+            graph_atoms += missing_atom_names
+
         self.graph.setData(
             pos=pos_arr,
             adj=adj,
@@ -70,7 +83,7 @@ class Main(pg.GraphicsLayoutWidget):
             symbol=symbols,
             pxMode=False,
             text=self.graph.get_text(),
-            atoms=self.qm_geom.atoms,
+            atoms=graph_atoms,
         )
         self.graph.updateGraph()
 
@@ -172,6 +185,7 @@ def run():
     log("Loading files using ParmEd:")
     for i, fn in enumerate(param_fns):
         log(f"\t{i:02d}: {fn}")
+    CharmmParameterSet(rtf)
     params = CharmmParameterSet(*param_fns)
     resis = params.residues
     log(f"Found {len(resis)} residue(s)")
@@ -197,7 +211,7 @@ def run():
         log(f"Loaded {psf}")
         log("Charges will be read from the supplied .psf file!")
 
-    if prm:
+    if top and prm:
         prm_backup_fn = prm_path.with_suffix(".prm.backup")
         dump_params(top, params, prm_backup_fn)
         log(f"Dumped parameter backup to '{prm_backup_fn}'")
